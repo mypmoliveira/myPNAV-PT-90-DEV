@@ -1,0 +1,60 @@
+OBJECT Codeunit 50001 mySubscribers
+{
+  OBJECT-PROPERTIES
+  {
+    Date=15/02/16;
+    Time=15:00:30;
+    Modified=Yes;
+    Version List=myP;
+  }
+  PROPERTIES
+  {
+    OnRun=BEGIN
+          END;
+
+  }
+  CODE
+  {
+    VAR
+      Location@1000 : Record 14;
+      InvtSetup@1001 : Record 313;
+      Item@1002 : Record 27;
+      Text50000@1003 : TextConst 'ENU=Item %1 is not on inventory.;ESP=El producto %1 no est† en el stock.;FRA=L''article %1 ne figure pas au stock.;ITA=L''articolo %1 non ä in magazzino.;PTG=O produto %1 n∆o est† inclu°do no invent†rio.;DEA=Artikel %1 ist nicht auf Lager.';
+
+    [EventSubscriber(Codeunit,22,OnInsertItemLedgEntry)]
+    LOCAL PROCEDURE NegativeStockValidate@3(ItemLedgEntry@1000 : Record 32;ItemJnlLine@1001 : Record 83;InventoryAtDate@1002 : Decimal);
+    BEGIN
+      WITH ItemJnlLine DO BEGIN
+        Location.RESET;
+          IF Location.GET(ItemJnlLine."Location Code") THEN
+            IF Location."Neg. Stock Control" THEN BEGIN
+            InvtSetup.GET();
+            IF InvtSetup."Negative Stock" THEN BEGIN
+              IF (ItemLedgEntry."Entry Type" IN [ItemLedgEntry."Entry Type"::"Negative Adjmt.",
+                ItemLedgEntry."Entry Type"::Sale,ItemLedgEntry."Entry Type"::Purchase,
+                ItemLedgEntry."Entry Type"::Consumption,ItemLedgEntry."Entry Type"::Output,
+                ItemLedgEntry."Entry Type"::Transfer]) AND (ItemLedgEntry.Quantity < 0)
+              THEN BEGIN
+              IF Item.GET("Item No.") THEN BEGIN
+                Item.SETFILTER("Location Filter","Location Code");
+                Item.SETFILTER("Variant Filter", "Variant Code");
+                Item.SETFILTER("Date Filter",'%1',ItemLedgEntry."Posting Date");
+                Item.CALCFIELDS("Inventory at Date");
+                IF InventoryAtDate + ItemLedgEntry.Quantity < 0 THEN
+                  ERROR(Text50000,ItemLedgEntry."Item No.");
+              END;
+            END;
+          END;
+        END;
+      END;
+    END;
+
+    BEGIN
+    {
+      MYP0006: Validaá∆o Stock Negativo - AAS - 2016-02-15
+              - Criaá∆o da funcá∆o do tipo Subscriber "NegativeStockValidate"
+    }
+    END.
+  }
+}
+
